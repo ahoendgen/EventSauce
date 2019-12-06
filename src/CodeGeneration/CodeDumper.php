@@ -25,11 +25,12 @@ class CodeDumper
         $this->definitionGroup = $definitionGroup;
         $definitionCode = $this->dumpClasses($definitionGroup->events(), $withHelpers, $withSerialization);
         $commandCode = $this->dumpClasses($definitionGroup->commands(), $withHelpers, $withSerialization);
+        $aggregateCode = $this->dumpAggregate($definitionGroup->aggregates(), false, false);
 
         $code = [];
 
-        foreach ($definitionCode as $index => $item) {
-            $namespace = $definitionGroup->namespace() . '\\Events';
+        foreach ($aggregateCode as $index => $item) {
+            $namespace = $definitionGroup->namespace() . '\\Aggregate';
 
             if ($withSerialization) {
                 $namespace .= ";
@@ -51,12 +52,39 @@ EOF;
             $code[] = [
                 'name' => $index,
                 'code' => $item,
-                'type' => 'Events',
+                'type' => 'Aggregate',
+            ];
+        }
+
+        foreach ($definitionCode as $index => $item) {
+            $namespace = $definitionGroup->namespace() . '\\Event';
+
+            if ($withSerialization) {
+                $namespace .= ";
+
+use EventSauce\EventSourcing\Serialization\SerializablePayload";
+            }
+
+            $item = <<<EOF
+<?php
+
+declare(strict_types=1);
+
+namespace $namespace;
+
+$item
+
+EOF;
+
+            $code[] = [
+                'name' => $index,
+                'code' => $item,
+                'type' => 'Event',
             ];
         }
 
         foreach ($commandCode as $index => $item) {
-            $namespace = $definitionGroup->namespace() . '\\Commands';
+            $namespace = $definitionGroup->namespace() . '\\Command';
 
             if ($withSerialization) {
                 $namespace .= ";
@@ -78,7 +106,7 @@ EOF;
             $code[] = [
                 'name' => $index,
                 'code' => $item,
-                'type' => 'Commands',
+                'type' => 'Command',
             ];
         }
 
@@ -111,6 +139,48 @@ EOF;
             $implements = empty($interfaces) ? '' : ' implements ' . implode(', ', $interfaces);
 
             $allSections = [$fields, $constructor, $methods, $deserializer, $testHelpers];
+            $allSections = array_filter(array_map('rtrim', $allSections));
+            $allCode = implode("\n\n", $allSections);
+
+            $code[$name] = <<<EOF
+final class $name$implements
+{
+$allCode
+}
+
+
+EOF;
+        }
+
+        return $code;
+    }
+
+    /**
+     * @param PayloadDefinition[] $definitions
+     */
+    private function dumpAggregate(array $definitions, bool $withHelpers, bool $withSerialization): array
+    {
+        $code = [];
+
+        if (empty($definitions)) {
+            return [];
+        }
+
+        foreach ($definitions as $definition) {
+            $name = $definition->name();
+            $interfaces = $definition->interfaces();
+            $events = $this->dumpEvents($definition);
+            $fields = $this->dumpFields($definition);
+            $constructor = $this->dumpConstructor($definition);
+            $methods = $this->dumpMethods($definition);
+            $testHelpers = $withHelpers ? $this->dumpTestHelpers($definition) : '';
+
+            if ($withSerialization) {
+                $interfaces[] = 'SerializablePayload';
+            }
+            $implements = empty($interfaces) ? '' : ' implements ' . implode(', ', $interfaces);
+
+            $allSections = [$fields, $constructor, $methods, $events, $testHelpers];
             $allSections = array_filter(array_map('rtrim', $allSections));
             $allCode = implode("\n\n", $allSections);
 
@@ -186,6 +256,27 @@ EOF;
     public function {$field['name']}(): {$this->definitionGroup->resolveTypeAlias($field['type'])}
     {
         return \$this->{$field['name']};
+    }
+
+
+EOF;
+        }
+
+        return implode('', $methods);
+    }
+
+    private function dumpEvents(PayloadDefinition $aggregate): string
+    {
+        $methods = [];
+
+        foreach ($aggregate->events() as $field) {
+            $lowerName = lcfirst($field['name']);
+            $class = '\\' . $this->definitionGroup->namespace() . '\\Event\\' . $field['name'];
+
+            $methods[] = <<<EOF
+    public function apply{$field['name']}({$class} \${$lowerName}): void
+    {
+    //TODO what shall we do with the drunken event
     }
 
 
@@ -325,6 +416,22 @@ EOF;
         }
 
         return $fields;
+    }
+
+    private function eventsFromDefinition(PayloadDefinition $definition): array
+    {
+        $events = [];
+        foreach ($this->definitionGroup->aggregates() as $definition) {
+            if ($definition->name() === $definition->fieldsFrom()) {
+                $events = $definition->events();
+            }
+        }
+
+        foreach ($definition->events() as $event) {
+            array_push($events, $event);
+        }
+
+        return $events;
     }
 
     private function fieldsFrom(string $fieldsFrom): array

@@ -22,6 +22,11 @@ final class PayloadDefinition
     private $fields = [];
 
     /**
+     * @var array[]
+     */
+    private $events = [];
+
+    /**
      * @var string
      */
     private $fieldsFrom = '';
@@ -74,6 +79,11 @@ final class PayloadDefinition
         return $this->fields;
     }
 
+    public function events(): array
+    {
+        return $this->events;
+    }
+
     public function fieldsFrom(): string
     {
         return $this->fieldsFrom;
@@ -83,6 +93,13 @@ final class PayloadDefinition
     {
         $example = $example ?: $this->group->exampleForField($name);
         $this->fields[] = compact('name', 'type', 'example');
+
+        return $this;
+    }
+
+    public function event(string $name): PayloadDefinition
+    {
+        $this->events[] = compact('name');
 
         return $this;
     }

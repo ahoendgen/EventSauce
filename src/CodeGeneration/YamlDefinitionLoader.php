@@ -52,6 +52,7 @@ class YamlDefinitionLoader implements DefinitionLoader
         $this->loadFieldDefaults($definitionGroup, $definition['fields'] ?? []);
         $this->loadCommands($definitionGroup, $definition['commands'] ?? []);
         $this->loadEvents($definitionGroup, $definition['events'] ?? []);
+        $this->loadAggregates($definitionGroup, $definition['aggregates'] ?? []);
 
         return $definitionGroup;
     }
@@ -89,6 +90,14 @@ class YamlDefinitionLoader implements DefinitionLoader
         }
     }
 
+    private function loadAggregates(DefinitionGroup $definitionGroup, array $aggregates): void
+    {
+        foreach ($aggregates as $aggregateName => $aggregateDefinition) {
+            $event = $definitionGroup->aggregate($aggregateName);
+            $this->hydrateDefinition($definitionGroup, $event, $aggregateDefinition);
+        }
+    }
+
     private function loadFieldDefaults(DefinitionGroup $definitionGroup, array $defaults): void
     {
         foreach ($defaults as $field => $default) {
@@ -119,6 +128,7 @@ class YamlDefinitionLoader implements DefinitionLoader
     {
         $definition->withFieldsFrom($input['fields_from'] ?? '');
         $fields = $input['fields'] ?? [];
+        $events = $input['events'] ?? [];
         $interfaces = $input['implements'] ?? [];
 
         foreach ((array) $interfaces as $interface) {
@@ -140,6 +150,10 @@ class YamlDefinitionLoader implements DefinitionLoader
             if (isset($fieldDefinition['deserializer'])) {
                 $definition->fieldDeserializer($fieldName, $fieldDefinition['deserializer']);
             }
+        }
+
+        foreach ($events as $fieldName => $fieldDefinition) {
+            $definition->event($fieldName);
         }
     }
 }

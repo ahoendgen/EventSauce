@@ -65,6 +65,11 @@ final class DefinitionGroup
     private $commands = [];
 
     /**
+     * @var PayloadDefinition[]
+     */
+    private $aggregates = [];
+
+    /**
      * @var string[]
      */
     private $typeAliases = [];
@@ -165,6 +170,11 @@ final class DefinitionGroup
         return $this->events[] = new PayloadDefinition($this, $name);
     }
 
+    public function aggregate(string $name): PayloadDefinition
+    {
+        return $this->aggregates[] = new PayloadDefinition($this, $name);
+    }
+
     public function command(string $name)
     {
         return $this->commands[] = new PayloadDefinition($this, $name);
@@ -194,6 +204,14 @@ final class DefinitionGroup
     public function commands(): array
     {
         return $this->commands;
+    }
+
+    /**
+     * @return PayloadDefinition[]
+     */
+    public function aggregates(): array
+    {
+        return $this->aggregates;
     }
 
     public function namespace(): string
