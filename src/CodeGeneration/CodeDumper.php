@@ -20,42 +20,80 @@ class CodeDumper
      */
     private $definitionGroup;
 
-    public function dump(DefinitionGroup $definitionGroup, bool $withHelpers = true, bool $withSerialization = true): string
+    public function dump(DefinitionGroup $definitionGroup, bool $withHelpers = true, bool $withSerialization = true): array
     {
         $this->definitionGroup = $definitionGroup;
         $definitionCode = $this->dumpClasses($definitionGroup->events(), $withHelpers, $withSerialization);
         $commandCode = $this->dumpClasses($definitionGroup->commands(), $withHelpers, $withSerialization);
-        $namespace = $definitionGroup->namespace();
 
-        $allCode = implode("\n\n", array_filter([$definitionCode, $commandCode]));
+        $code = [];
 
-        if ($withSerialization) {
-            $namespace .= ";
+        foreach ($definitionCode as $index => $item) {
+            $namespace = $definitionGroup->namespace() . '\\Events';
+
+            if ($withSerialization) {
+                $namespace .= ";
 
 use EventSauce\EventSourcing\Serialization\SerializablePayload";
-        }
+            }
 
-        return <<<EOF
+            $item = <<<EOF
 <?php
 
 declare(strict_types=1);
 
 namespace $namespace;
 
-$allCode
+$item
 
 EOF;
+
+            $code[] = [
+                'name' => $index,
+                'code' => $item,
+                'type' => 'Events',
+            ];
+        }
+
+        foreach ($commandCode as $index => $item) {
+            $namespace = $definitionGroup->namespace() . '\\Commands';
+
+            if ($withSerialization) {
+                $namespace .= ";
+
+use EventSauce\EventSourcing\Serialization\SerializablePayload";
+            }
+
+            $item = <<<EOF
+<?php
+
+declare(strict_types=1);
+
+namespace $namespace;
+
+$item
+
+EOF;
+
+            $code[] = [
+                'name' => $index,
+                'code' => $item,
+                'type' => 'Commands',
+            ];
+        }
+
+        return $code;
     }
 
     /**
      * @param PayloadDefinition[] $definitions
      */
-    private function dumpClasses(array $definitions, bool $withHelpers, bool $withSerialization): string
+    private function dumpClasses(array $definitions, bool $withHelpers, bool $withSerialization): array
     {
         $code = [];
 
         if (empty($definitions)) {
-            return '';
+            return [];
         }
 
         foreach ($definitions as $definition) {
@@ -76,7 +114,7 @@ EOF;
             $allSections = array_filter(array_map('rtrim', $allSections));
             $allCode = implode("\n\n", $allSections);
 
-            $code[] = <<<EOF
+            $code[$name] = <<<EOF
 final class $name$implements
 {
 $allCode
@@ -86,7 +124,7 @@ $allCode
 EOF;
         }
 
-        return rtrim(implode('', $code));
+        return $code;
     }
 
     private function dumpFields(PayloadDefinition $definition): string
@@ -102,10 +140,7 @@ EOF;
             $type = $this->definitionGroup->resolveTypeAlias($field['type']);
 
             $code[] = <<<EOF
-    /**
-     * @var $type
-     */
-    private \$$name;
+    private $type \$$name;
 
 
 EOF;
