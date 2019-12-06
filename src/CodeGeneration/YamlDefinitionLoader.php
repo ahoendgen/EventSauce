@@ -30,7 +30,12 @@ class YamlDefinitionLoader implements DefinitionLoader
             throw new InvalidArgumentException("File {$filename} does not contain anything");
         }
 
-        $definition = Yaml::parse($fileContents);
+        return $this->parse($fileContents, $definitionGroup);
+    }
+
+    public function parse(string $yaml, DefinitionGroup $definitionGroup = null): DefinitionGroup
+    {
+        $definition = Yaml::parse($yaml);
 
         if ( ! is_array($definition)) {
             throw new InvalidArgumentException('The definition is incorrectly formatted');
